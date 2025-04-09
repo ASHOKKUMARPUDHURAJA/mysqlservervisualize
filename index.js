@@ -88,6 +88,6 @@ app.post('/analyze', async (req, res) => {
   }
 });
 
-app.listen(9090, () => {
-  console.log('🚀 Backend running at http://localhost:9090');
+app.listen(10000, () => {
+  console.log('🚀 Backend running at http://localhost:10000');
 });
