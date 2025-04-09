@@ -48,43 +48,51 @@ app.post('/explainanalyze', (req, res) => {
   });
 });
 
+const logger = require('./logger');
+
+
 app.post('/analyze', async (req, res) => {
   const { host, user, password, database, query } = req.body;
 
+  logger.info(`POST /analyze | Query: ${query}`);
+
   if (!validateInputs({ host, user, database, query })) {
+    logger.warn('POST /analyze | Missing input fields');
     return res.status(400).json({ error: 'All input fields are required' });
   }
 
   const connection = mysql.createConnection({ host, user, password, database });
 
+  const runQuery = (sql) => {
+    logger.info(`Running query: ${sql}`);
+    return new Promise((resolve, reject) => {
+      connection.query(sql, (err, results) => {
+        if (err) {
+          logger.error(`Query failed: ${sql} | Error: ${err.message}`);
+          return reject(err);
+        }
+        logger.info(`Query successful: ${sql}`);
+        resolve(results);
+      });
+    });
+  };
+
   try {
-    const explainPromise = new Promise((resolve, reject) => {
-      connection.query("explain " + query, (err, results) => {
-        if (err) {
-          reject(err);
-        } else {
-          resolve(results);
-        }
-      });
-    });
+    const explainResults = await runQuery("EXPLAIN " + query);
+    const explainAnalyzeResults = await runQuery("EXPLAIN ANALYZE " + query);
 
-    const explainAnalyzePromise = new Promise((resolve, reject) => {
-      connection.query("explain analyze " + query, (err, results) => {
-        if (err) {
-          reject(err);
-        } else {
-          resolve(results);
-        }
-      });
-    });
-
-    const [explainResults, explainAnalyzeResults] = await Promise.all([explainPromise, explainAnalyzePromise]);
-
+    logger.info('POST /analyze | Sending response');
     res.json({ explainResults, explainAnalyzeResults });
   } catch (err) {
+    logger.error(`POST /analyze | Error: ${err.message}`);
     res.status(400).json({ error: err.message });
   } finally {
-    connection.end();
+    try {
+      connection.end();
+      logger.info('Database connection closed');
+    } catch (endErr) {
+      logger.warn(`Error closing DB connection: ${endErr.message}`);
+    }
   }
 });
 
